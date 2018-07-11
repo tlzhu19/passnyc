@@ -1,0 +1,220 @@
+---
+title: "PASSNYC"
+author: "Tiffany Zhu"
+output:
+  pdf_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = T, echo = F, cache=T, fig.align='center')
+rm(list = ls())
+library(ggplot2)
+library(plyr)
+library(gridExtra) # install.packages('gridExtra')
+library(xtable) # install.packages('xtable')
+library(knitr)
+
+cbPalette <- c("#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
+
+# option+command+i -> ``` thing
+# option+command+r -> run all
+# shift+option+command+m -> change all vars
+# shift+command+c -> comment/uncomment
+```
+
+# Overview
+PASSNYC is a not-for-profit organization that facilitates a collective impact that is dedicated to broadening educational opportunities for New York City's talented and underserved students. New York City is home to some of the most impressive educational institutions in the world, yet in recent years, the City’s specialized high schools - institutions with historically transformative impact on student outcomes - have seen a shift toward more homogeneous student body demographics.
+
+PASSNYC uses public data to identify students within New York City’s under-performing school districts and, through consulting and collaboration with partners, aims to increase the diversity of students taking the Specialized High School Admissions Test (SHSAT). By focusing efforts in under-performing areas that are historically underrepresented in SHSAT registration, we will help pave the path to specialized high schools for a more diverse group of students.
+
+# Problem Statement
+PASSNYC and its partners provide outreach services that improve the chances of students taking the SHSAT and receiving placements in these specialized high schools. The current process of identifying schools is effective, but PASSNYC could have an even greater impact with a more informed, granular approach to quantifying the potential for outreach at a given school. Proxies that have been good indicators of these types of schools include data on English Language Learners, Students with Disabilities, Students on Free/Reduced Lunch, and Students with Temporary Housing.
+
+Part of this challenge is to assess the needs of students by using publicly available data to quantify the challenges they face in taking the SHSAT. The best solutions will enable PASSNYC to identify the schools where minority and underserved students stand to gain the most from services like after school programs, test preparation, mentoring, or resources for parents.
+
+Submissions for the Main Prize Track will be judged based on the following general criteria:
+
+* Performance - How well does the solution match schools and the needs of students to PASSNYC services? PASSNYC will not be able to live test every submission, so a strong entry will clearly articulate why it is effective at tackling the problem.
+
+* Influential - The PASSNYC team wants to put the winning submissions to work quickly. Therefore a good entry will be easy to understand and will enable PASSNYC to convince stakeholders where services are needed the most.
+
+* Shareable - PASSNYC works with over 60 partner organizations to offer services such as test preparation, tutoring, mentoring, extracurricular programs, educational consultants, community and student groups, trade associations, and more. Winning submissions will be able to provide convincing insights to a wide subset of these organizations.
+
+
+# Loading Data
+```{r, echo=T}
+setwd("~/Desktop/other/data-science-for-good/passnyc")
+school_data <- read.csv('2016 School Explorer.csv')
+shsat_data <- read.csv('D5 SHSAT Registrations and Testers.csv')
+```
+
+```{r}
+# change factors to numeric
+school_data$Economic.Need.Index <- as.numeric(school_data$Economic.Need.Index)
+school_data$Percent.Asian <- as.numeric(school_data$Percent.Asian)
+school_data$Percent.Black <- as.numeric(school_data$Percent.Black)
+school_data$Percent.Hispanic <- as.numeric(school_data$Percent.Hispanic)
+school_data$Percent.White <- as.numeric(school_data$Percent.White)
+school_data$Percent.ELL <- as.numeric(school_data$Percent.ELL)
+```
+
+```{r}
+x1 = dim(school_data)[1]
+v1 = dim(school_data)[2]
+x2 = dim(shsat_data)[1]
+v2 = dim(shsat_data)[2]
+```
+
+There are `r x1` observations and `r v1` variables in ```school_data```.
+There are `r x2` observations and `r v2` variables in ```shsat_data```.
+```{r, include=F}
+names(shsat_data)
+```
+
+# Data Exploration
+Looking at top cities with the most schools represented in this data set:
+```{r, fig.align='center', fig.width=4, fig.height=3.5}
+city_count = count(school_data, 'City')
+ordered_city_count = (city_count[order(-city_count$freq), ])[1:10, ]
+city_plot = ggplot(ordered_city_count,aes(x= reorder(ordered_city_count$City,-ordered_city_count$freq),ordered_city_count$freq))+geom_bar(stat ="identity", fill=cbPalette[1])
+
+city_plot + labs(x = "City", y='Number of Schools') +  theme(axis.text.x=element_text(angle=45, hjust=1))
+```
+
+
+## Location and Economic Need
+```{r, fig.width=6, fig.height=3}
+p1 <- ggplot(school_data, aes(x = Longitude, y = Latitude, size = Economic.Need.Index, fill=District)) + geom_point(shape=21, alpha=0.5) #+ guides(fill=F)
+# p1 <- ggplot(school_data, aes(x = Longitude, y = Latitude, size=Economic.Need.Index, fill=Economic.Need.Index)) + geom_point(shape=21, alpha=0.5)
+p1
+```
+
+## Race
+
+### Race and Number of School
+```{r}
+p1=ggplot(data=school_data, aes(school_data$Percent.Asian)) + geom_histogram(bins=20, fill=cbPalette[1]) + labs(x = "Percent Asian", y='Number of Schools')
+
+p2=ggplot(data=school_data, aes(school_data$Percent.White)) + geom_histogram(bins=20, fill=cbPalette[2]) + labs(x = "Percent White", y='Number of Schools')
+
+p3=ggplot(data=school_data, aes(school_data$Percent.Black)) + geom_histogram(bins=20, fill=cbPalette[3]) + labs(x = "Percent Black", y='Number of Schools')
+
+p4=ggplot(data=school_data, aes(school_data$Percent.Hispanic)) + geom_histogram(bins=20, fill=cbPalette[4]) + labs(x = "Percent Hispanic", y='Number of Schools')
+
+grid.arrange(p1, p2, p3, p4, ncol = 2)
+```
+
+### Race and Economic Need
+```{r}
+# y_vars = c(school_data$Percent.Asian, school_data$Percent.White, school_data$Percent.Black, school_data$Percent.Hispanic)
+# plots = c()
+# for (i in 1:4){
+#   plots[i] = ggplot(school_data,aes(Economic.Need.Index,y_vars[i]))+geom_point(color=cbPalette[i], alpha=0.3)+geom_smooth(method='lm')
+# }
+# grid.arrange(grobs=plots, ncol = 2)
+
+p1 = ggplot(school_data,aes(Economic.Need.Index,Percent.Asian))+geom_point(color=cbPalette[1], alpha=0.4, shape=20, stroke=0)+geom_smooth(method='lm')
+
+p2=ggplot(school_data,aes(Economic.Need.Index,Percent.White))+geom_point(color=cbPalette[2], alpha=0.4, shape=20, stroke=0)+geom_smooth(method='lm')
+
+p3=ggplot(school_data,aes(Economic.Need.Index,Percent.Black))+geom_point(color=cbPalette[3], alpha=0.4, shape=20, stroke=0)+geom_smooth(method='lm')
+
+p4=ggplot(school_data,aes(Economic.Need.Index,Percent.Hispanic))+geom_point(color=cbPalette[4], alpha=0.4, shape=20, stroke=0)+geom_smooth(method='lm')
+
+grid.arrange(p1, p2, p3, p4, ncol=2)
+
+```
+
+## ESL Students
+
+## Student Attendance Rate
+
+## School Income Estimate and Economic Need Index
+
+## Support from the Community and School
+Variables to look at: 
+
+* Community School,
+* Collaborative Teachers,
+* Supportive Environment, 
+* Effective School Leader Ship, 
+* Strong Family, 
+* Trust
+
+# Models
+## Setting Up
+
+### What are we going to predict?
+```{r}
+shsat_data$percentage_registered <- shsat_data$Number.of.students.who.registered.for.the.SHSAT / shsat_data$Enrollment.on.10.31
+
+shsat_data$percentage_taken <- shsat_data$Number.of.students.who.took.the.SHSAT / shsat_data$Enrollment.on.10.31
+```
+
+
+We want to be able to predict the number of students who will (1) register for the SHSAT and (2) actually take the SHSAT. To train our model, we can use the data from ```shsat_data``` (more specifically, the enrollment number, number of student registered/took the SHSAT) to know the percentage of students who do both (1) and (2). Our dependent variable (the variable we are trying to predict) will be this percentage since in our testing data, we do not know the enrollment numbers. We will call these variables ```percentage_registered``` and ```percentage_taken```. Thus,
+
+```percentage_registered``` \[
+     = \frac{ \texttt{Number.of.students.who.registered.for.the.SHSAT}  }{ \texttt{Enrollment.on.10.31 } }
+\]
+
+and,
+
+```percentage_taken``` \[
+    = \frac{ \texttt{Number.of.students.who.took.the.SHSAT}  }{ \texttt{Enrollment.on.10.31} }
+\]
+
+
+### How do we use the data given?
+```{r}
+school_intersections = intersect(school_data$Location.Code, shsat_data$DBN)
+characteristics = school_data[school_data$Location.Code %in% school_intersections, ]
+registered = shsat_data[shsat_data$DBN %in% school_intersections, ]
+```
+
+There are `r length(school_intersections)` schools  in both ```school_data``` (characteristics about the schools) and ```shsat_data``` (data about schools whose students enrolled in SHST). We can use these schools to create a model.
+
+These schools are:
+```{r}
+myvars <- c("Location.Code", "School.Name")
+newdata <- characteristics[myvars]
+rownames(newdata) <- 1:nrow(newdata)
+
+kable(newdata, row.names=T)
+```
+
+It should be noted that in given data that contains information about SHSAT registration (```shsat_data```), a school may have multiple rows of data because it takes into account the year. However, the other data set (```school_data```) has just one row for each school and does not specify the year.
+
+Possible ways to take this into account:
+
+* Try creating models for each year
+
+* Take average over the years for each school
+
+Either way, we'd only have `r length(school_intersections)` training points but `r dim(school_data)[1] - length(school_intersections)` testing points.
+ 
+## Linear Regression
+```{r}
+train_data = characteristics
+
+# with(registered, aggregate(list(Enrollment.on.10.31, Number.of.students.who.registered.for.the.SHSAT, Number.of.students.who.took.the.SHSAT), list(DBN, Year.of.SHST), sum))
+
+year_2013 = registered[registered$Year.of.SHST==2013, ]
+train_data$percentage_registered <- year_2013$percentage_registered[match(year_2013$DBN, train_data$Location.Code)]
+train_data$percentage_taken <- year_2013$percentage_taken[match(year_2013$DBN, train_data$Location.Code)]
+
+lm1 <- lm(percentage_registered ~ . - percentage_taken, data=train_data, na.action=na.exclude)
+signif(coefficients(nampd.lm),3)
+```
+
+
+## Random Forest and Variance Importance
+
+# Conclusions
+Lorem ipsum dolor sit amet, an eos tation consequuntur, vis bonorum mediocritatem cu. Mel erat legere id. Vis ei agam omnesque, in pri reque volutpat conceptam, ad nihil timeam lucilius nec. Sed ne verterem tacimates. Tritani scaevola nec ex, sint doming tacimates ei mea. Nam ea blandit invidunt. Vix ne nusquam placerat democritum. Nam ei vidisse debitis, at malis doming sed. Ea dicit efficiendi pro. Iudico iisque accommodare ei per.
+
+Eam quot delicata ut. Natum nusquam definitiones ei qui. Enim cetero euismod cu usu, noster luptatum ea vis. Ex deserunt maiestatis sit, et saepe vidisse appareat vix. Vidit adhuc has in, his suscipit mediocritatem ex, mei prima suscipiantur an. Quas regione adversarium has ei, falli appareat voluptaria vel ei.
+
